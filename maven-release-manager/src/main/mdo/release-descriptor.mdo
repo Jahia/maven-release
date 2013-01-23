@@ -199,6 +199,18 @@
           </description>
         </field>
         <field>
+          <name>fallbackSnapshotDependencies</name>
+          <version>1.0.0+</version>
+          <type>Map</type>
+          <association>
+            <type>String</type>
+            <multiplicity>*</multiplicity>
+          </association>
+          <description>
+            A map of fallback snapshot dependencies versions.
+          </description>
+        </field>
+        <field>
           <name>updateDependencies</name>
           <version>1.0.0+</version>
           <type>boolean</type>

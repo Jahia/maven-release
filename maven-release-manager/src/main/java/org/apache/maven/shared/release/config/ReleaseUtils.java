@@ -112,6 +112,10 @@ public class ReleaseUtils
         {
             mergeInto.getDevelopmentVersions().putAll( toBeMerged.getDevelopmentVersions() );
         }
+        if ( toBeMerged.getFallbackSnapshotDependencies() != null )
+        {
+            mergeInto.getFallbackSnapshotDependencies().putAll( toBeMerged.getFallbackSnapshotDependencies() );
+        }
         // These must be overridden, as they are not stored
         mergeInto.setWorkingDirectory(
             mergeOverride( mergeInto.getWorkingDirectory(), toBeMerged.getWorkingDirectory() ) );

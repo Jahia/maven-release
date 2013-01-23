@@ -162,25 +162,34 @@ public class CheckDependencySnapshotsPhase
         if ( !usedSnapshotDependencies.isEmpty() || !usedSnapshotReports.isEmpty()
                         || !usedSnapshotExtensions.isEmpty() || !usedSnapshotPlugins.isEmpty() )
         {
-            if ( releaseDescriptor.isInteractive() )
+            if ( !releaseDescriptor.getFallbackSnapshotDependencies().isEmpty() )
             {
-                resolveSnapshots( usedSnapshotDependencies, usedSnapshotReports, usedSnapshotExtensions,
-                                  usedSnapshotPlugins, releaseDescriptor );
+                autoResolveSnapshots( usedSnapshotDependencies, usedSnapshotReports, usedSnapshotExtensions,
+                        usedSnapshotPlugins, releaseDescriptor );
             }
-
             if ( !usedSnapshotDependencies.isEmpty() || !usedSnapshotReports.isEmpty()
-                            || !usedSnapshotExtensions.isEmpty() || !usedSnapshotPlugins.isEmpty() )
+                    || !usedSnapshotExtensions.isEmpty() || !usedSnapshotPlugins.isEmpty() )
             {
-                StringBuilder message = new StringBuilder();
-
-                printSnapshotDependencies( usedSnapshotDependencies, message );
-                printSnapshotDependencies( usedSnapshotReports, message );
-                printSnapshotDependencies( usedSnapshotExtensions, message );
-                printSnapshotDependencies( usedSnapshotPlugins, message );
-                message.append( "in project '" + project.getName() + "' (" + project.getId() + ")" );
-
-                throw new ReleaseFailureException(
-                    "Can't release project due to non released dependencies :\n" + message );
+                if ( releaseDescriptor.isInteractive() )
+                {
+                    resolveSnapshots( usedSnapshotDependencies, usedSnapshotReports, usedSnapshotExtensions,
+                                      usedSnapshotPlugins, releaseDescriptor );
+                }
+    
+                if ( !usedSnapshotDependencies.isEmpty() || !usedSnapshotReports.isEmpty()
+                                || !usedSnapshotExtensions.isEmpty() || !usedSnapshotPlugins.isEmpty() )
+                {
+                    StringBuilder message = new StringBuilder();
+    
+                    printSnapshotDependencies( usedSnapshotDependencies, message );
+                    printSnapshotDependencies( usedSnapshotReports, message );
+                    printSnapshotDependencies( usedSnapshotExtensions, message );
+                    printSnapshotDependencies( usedSnapshotPlugins, message );
+                    message.append( "in project '" + project.getName() + "' (" + project.getId() + ")" );
+    
+                    throw new ReleaseFailureException(
+                        "Can't release project due to non released dependencies :\n" + message );
+                }
             }
         }
     }
@@ -473,4 +482,70 @@ public class CheckDependencySnapshotsPhase
 
         return resolvedSnapshots;
     }
+
+    private void autoResolveSnapshots( Set<Artifact> projectDependencies, Set<Artifact> reportDependencies, 
+                                   Set<Artifact> extensionDependencies, Set<Artifact> pluginDependencies, 
+                                   ReleaseDescriptor releaseDescriptor )
+        throws ReleaseExecutionException
+    {
+        try
+        {
+            Map<String, Map<String, String>> resolvedSnapshots = null;
+            resolvedSnapshots = processSnapshotFallback( projectDependencies, releaseDescriptor );
+            resolvedSnapshots.putAll( processSnapshotFallback( pluginDependencies, releaseDescriptor ) );
+            resolvedSnapshots.putAll( processSnapshotFallback( reportDependencies, releaseDescriptor ) );
+            resolvedSnapshots.putAll( processSnapshotFallback( extensionDependencies, releaseDescriptor ) );
+            releaseDescriptor.getResolvedSnapshotDependencies().putAll( resolvedSnapshots );
+        }
+        catch ( PrompterException e )
+        {
+            throw new ReleaseExecutionException( e.getMessage(), e );
+        }
+        catch ( VersionParseException e )
+        {
+            throw new ReleaseExecutionException( e.getMessage(), e );
+        }
+    }
+
+    private Map<String, Map<String, String>> processSnapshotFallback( Set<Artifact> snapshotSet, 
+            ReleaseDescriptor releaseDescriptor ) throws PrompterException, VersionParseException
+        {
+            Map<String, Map<String, String>> resolvedSnapshots = new HashMap<String, Map<String, String>>();
+            Iterator<Artifact> iterator = snapshotSet.iterator();
+
+            while ( iterator.hasNext() )
+            {
+                Artifact currentArtifact = iterator.next( );
+                String versionlessKey = ArtifactUtils.versionlessKey( currentArtifact );
+
+                Map deps = releaseDescriptor.getFallbackSnapshotDependencies( );
+                if ( deps == null )
+                {
+                    continue;
+                }
+                Map fallbackMap = ( Map ) ( deps.containsKey( versionlessKey ) ? deps
+                        .get( versionlessKey ) : deps.get( currentArtifact.getGroupId( ) + ":*" ) );
+                if ( fallbackMap == null )
+                {
+                    fallbackMap = ( Map ) deps.get( "*:" + currentArtifact.getArtifactId( ) );
+                }
+                if ( fallbackMap != null && fallbackMap.get( ReleaseDescriptor.RELEASE_KEY ) != null )
+                {
+                    Map<String, String> versionMap = new HashMap<String, String>();
+                    VersionInfo versionInfo = new DefaultVersionInfo( currentArtifact.getVersion() );
+                    versionMap.put( ReleaseDescriptor.ORIGINAL_VERSION, versionInfo.toString() );
+                    versionMap.put( ReleaseDescriptor.RELEASE_KEY, 
+                        ( String ) fallbackMap.get( ReleaseDescriptor.RELEASE_KEY ) );
+                    String devVersion = ( String ) fallbackMap.get( ReleaseDescriptor.DEVELOPMENT_KEY );
+                    versionMap.put( ReleaseDescriptor.DEVELOPMENT_KEY, 
+                        devVersion != null && devVersion.length() > 0 
+                            ? devVersion 
+                            : ( String ) versionMap.get( ReleaseDescriptor.RELEASE_KEY ) );
+                    iterator.remove( );
+                    resolvedSnapshots.put( versionlessKey, versionMap );
+                }
+            }
+
+            return resolvedSnapshots;
+        }
 }
