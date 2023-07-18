@@ -19,10 +19,6 @@ package org.apache.maven.shared.release.phase;
  * under the License.
  */
 
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.model.Scm;
 import org.apache.maven.project.MavenProject;
@@ -32,8 +28,12 @@ import org.apache.maven.shared.release.ReleaseResult;
 import org.apache.maven.shared.release.config.ReleaseDescriptor;
 import org.apache.maven.shared.release.scm.ScmTranslator;
 import org.apache.maven.shared.release.util.ReleaseUtil;
-import org.jdom.Element;
-import org.jdom.Namespace;
+import org.jdom2.Element;
+import org.jdom2.Namespace;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Rewrite POMs for release.
